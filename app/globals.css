@@ -1,0 +1,174 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Graphite + electric blue. Neutral greys, one accent, Geist type.
+ */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-geist-sans);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* Light */
+:root {
+  --background: #f7f7f8;
+  --foreground: #0f1114;
+  --surface: #eeeff2;
+  --surface-2: #e5e7eb;
+  --card: #ffffff;
+  --card-foreground: #0f1114;
+  --popover: #ffffff;
+  --popover-foreground: #0f1114;
+  --primary: #2f5bea;
+  --primary-foreground: #ffffff;
+  --secondary: #eeeff2;
+  --secondary-foreground: #0f1114;
+  --muted: #f0f1f3;
+  --muted-foreground: #6b7079;
+  --accent: #eeeff2;
+  --accent-foreground: #0f1114;
+  --destructive: #dc3545;
+  --border: #e4e5e8;
+  --input: #d9dbe0;
+  --ring: #2f5bea;
+  --chart-1: #2f5bea;
+  --chart-2: #6b7079;
+  --chart-3: #9aa0aa;
+  --chart-4: #3a3f47;
+  --chart-5: #0f1114;
+  --radius: 0.75rem;
+  --sidebar: #f2f3f5;
+  --sidebar-foreground: #0f1114;
+  --sidebar-primary: #2f5bea;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e7e8eb;
+  --sidebar-accent-foreground: #0f1114;
+  --sidebar-border: #e4e5e8;
+  --sidebar-ring: #2f5bea;
+}
+
+/* Dark: graphite */
+.dark {
+  --background: #0b0c0e;
+  --foreground: #f2f3f5;
+  --surface: #16181c;
+  --surface-2: #1e2126;
+  --card: #121418;
+  --card-foreground: #f2f3f5;
+  --popover: #16181c;
+  --popover-foreground: #f2f3f5;
+  --primary: #3b6cff;
+  --primary-foreground: #ffffff;
+  --secondary: #1b1d22;
+  --secondary-foreground: #f2f3f5;
+  --muted: #16181c;
+  --muted-foreground: #8b9099;
+  --accent: #1e2126;
+  --accent-foreground: #f2f3f5;
+  --destructive: #f2555a;
+  --border: #23262c;
+  --input: #2c3037;
+  --ring: #3b6cff;
+  --chart-1: #3b6cff;
+  --chart-2: #8b9099;
+  --chart-3: #5b6069;
+  --chart-4: #2c3037;
+  --chart-5: #f2f3f5;
+  --sidebar: #0e0f12;
+  --sidebar-foreground: #f2f3f5;
+  --sidebar-primary: #3b6cff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1b1d22;
+  --sidebar-accent-foreground: #f2f3f5;
+  --sidebar-border: #1d2025;
+  --sidebar-ring: #3b6cff;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+    -webkit-tap-highlight-color: transparent;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 35%, transparent);
+  }
+  /* No spinner arrows on number-ish inputs; scroll wheel must never change values. */
+  input::-webkit-outer-spin-button,
+  input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+}
+
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Headings: semibold, sentence case, tight tracking. */
+@utility display {
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+}
+
+
+/* Tabular numbers for weights/reps. */
+@utility numeric {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
