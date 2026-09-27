@@ -38,14 +38,18 @@ export function ResponsiveModal({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="flex max-h-[88dvh] flex-col rounded-t-2xl pb-safe">
+      <SheetContent
+        side="bottom"
+        // Ride above the on-screen keyboard (see KeyboardInset).
+        className="flex max-h-[min(88dvh,calc(var(--vvh,100dvh)-1rem))] flex-col rounded-t-2xl pb-safe data-[side=bottom]:bottom-[var(--kb-inset,0px)]"
+      >
         <SheetHeader className="pb-0">
           <SheetTitle className="display text-lg">{title}</SheetTitle>
           <SheetDescription className={description ? undefined : "sr-only"}>
             {description ?? title}
           </SheetDescription>
         </SheetHeader>
-        <div className="flex min-h-0 flex-1 flex-col px-4 pb-4">{children}</div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-4">{children}</div>
       </SheetContent>
     </Sheet>
   );

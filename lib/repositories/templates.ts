@@ -15,8 +15,8 @@ export async function fetchTemplates(): Promise<{
     supabase.from("workout_templates").select("*").order("created_at"),
     supabase.from("template_exercises").select("*").order("position"),
   ]);
-  check(t.error, "Could not load workouts");
-  check(te.error, "Could not load workouts");
+  check(t.error, "Couldn’t load routines");
+  check(te.error, "Couldn’t load routines");
   return { templates: t.data ?? [], templateExercises: te.data ?? [] };
 }
 
@@ -30,7 +30,7 @@ export async function saveTemplate(
   items: TemplateItemInput[],
 ): Promise<string> {
   const value = name.trim();
-  if (!value) throw new RepositoryError("Workout name is required.");
+  if (!value) throw new RepositoryError("Give the routine a name.");
   const templateId = id ?? newId();
 
   const supabase = getSupabase();
@@ -39,15 +39,15 @@ export async function saveTemplate(
     p_name: value,
     p_items: items.map((i) => ({ exercise_id: i.exerciseId, default_sets: i.defaultSets })),
   });
-  check(error, "Could not save workout");
+  check(error, "Couldn’t save routine");
 
   // Re-read the canonical rows (server assigns template_exercise ids/timestamps).
   const [t, te] = await Promise.all([
     supabase.from("workout_templates").select("*").eq("id", templateId).single(),
     supabase.from("template_exercises").select("*").eq("template_id", templateId),
   ]);
-  check(t.error, "Could not reload workout");
-  check(te.error, "Could not reload workout");
+  check(t.error, "Couldn’t reload routine");
+  check(te.error, "Couldn’t reload routine");
 
   await db.transaction("rw", [db.templates, db.templateExercises], async () => {
     await db.templates.put(t.data);
@@ -59,7 +59,7 @@ export async function saveTemplate(
 
 export async function deleteTemplate(id: string): Promise<void> {
   const { error } = await getSupabase().from("workout_templates").delete().eq("id", id);
-  check(error, "Could not delete workout");
+  check(error, "Couldn’t delete routine");
   await db.transaction("rw", [db.templates, db.templateExercises], async () => {
     await db.templates.delete(id);
     await db.templateExercises.where("template_id").equals(id).delete();

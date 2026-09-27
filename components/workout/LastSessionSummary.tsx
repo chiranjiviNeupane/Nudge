@@ -5,17 +5,20 @@ import { ChevronRight } from "lucide-react";
 import { formatSet, formatShortDate } from "@/lib/format";
 import type { LastSession } from "@/lib/db/types";
 import { rememberReturn, RETURN_TO_WORKOUT } from "@/lib/navigation/returnTo";
+import type { WeightUnit } from "@/lib/units";
 
 /** Only the single most recent session — full history lives on the exercise page. */
 export function LastSessionSummary({
   exerciseId,
   last,
+  unit,
 }: {
   exerciseId: string;
   last: LastSession | null;
+  unit: WeightUnit;
 }) {
   if (!last) {
-    return <p className="text-sm text-muted-foreground">First time, no previous session</p>;
+    return <p className="text-sm text-muted-foreground">First time: today sets your baseline</p>;
   }
   return (
     <Link
@@ -29,7 +32,7 @@ export function LastSessionSummary({
         {last.sets.map((s, i) => (
           <span key={s.set_number} className="whitespace-nowrap">
             {i > 0 && <span className="text-muted-foreground/50"> · </span>}
-            {formatSet(s, false)}
+            {formatSet(s, unit)}
           </span>
         ))}
       </span>

@@ -1,6 +1,7 @@
 import { newId } from "@/lib/id";
 import type { ActiveSession, DraftExercise, DraftSet, ExerciseKind } from "@/lib/db/types";
 import type { SaveSessionPayload } from "@/lib/repositories/sessions";
+import { fromKg, toKg, type WeightUnit } from "@/lib/units";
 
 // Pure, immutable operations on the active workout draft. They only affect
 // today's session; templates are never modified.
@@ -47,6 +48,7 @@ export function addSet(s: ActiveSession, exId: string): ActiveSession {
       reps: prev?.reps ?? "",
       duration: prev?.duration ?? "",
       incline: prev?.incline ?? "",
+      weightKg: prev?.weightKg,
       completed: false,
       // Added deliberately, so it counts as worked on.
       touched: true,
@@ -59,6 +61,16 @@ export function removeSet(s: ActiveSession, exId: string, setId: string): Active
   return mapExercise(s, exId, (e) => ({ ...e, sets: e.sets.filter((x) => x.id !== setId) }));
 }
 
+/** Puts a removed set back at `index` (undo). No-op if the exercise is gone or the set is already there. */
+export function insertSet(s: ActiveSession, exId: string, set: DraftSet, index: number): ActiveSession {
+  return mapExercise(s, exId, (e) => {
+    if (e.sets.some((x) => x.id === set.id)) return e;
+    const sets = [...e.sets];
+    sets.splice(index, 0, set);
+    return { ...e, sets };
+  });
+}
+
 export function setSkipped(s: ActiveSession, exId: string, skipped: boolean): ActiveSession {
   return mapExercise(s, exId, (e) => ({ ...e, skipped }));
 }
@@ -69,6 +81,14 @@ export function removeExercise(s: ActiveSession, exId: string): ActiveSession {
 
 export function addExercise(s: ActiveSession, exercise: DraftExercise): ActiveSession {
   return { ...s, exercises: [...s.exercises, exercise] };
+}
+
+/** Puts a removed exercise back at `index` (undo). No-op if it's already there. */
+export function insertExercise(s: ActiveSession, exercise: DraftExercise, index: number): ActiveSession {
+  if (s.exercises.some((e) => e.id === exercise.id)) return s;
+  const exercises = [...s.exercises];
+  exercises.splice(index, 0, exercise);
+  return { ...s, exercises };
 }
 
 export function moveExercise(s: ActiveSession, exId: string, delta: -1 | 1): ActiveSession {
@@ -112,6 +132,15 @@ export function parseDuration(v: string | undefined): number | null {
   const seconds =
     n.length === 3 ? n[0] * 3600 + n[1] * 60 + n[2] : n.length === 2 ? n[0] * 60 + n[1] : n[0] * 60;
   return seconds > 0 ? seconds : null;
+}
+
+/** A draft set's weight in kg (null = empty / bodyweight), typed in `unit`. */
+export function draftWeightKg(set: DraftSet, unit: WeightUnit): number | null {
+  const w = parseWeight(set.weight);
+  if (w === null) return null;
+  // Unchanged pre-fill: keep the exact stored kg (lb display is rounded).
+  if (set.weightKg !== undefined && w === fromKg(set.weightKg, unit)) return set.weightKg;
+  return toKg(w, unit);
 }
 
 /** Incline in %, e.g. "8" / "8.5" / "-2". */
@@ -188,6 +217,8 @@ export function toSavePayload(
   completedAt = new Date(),
   mode: SaveMode = "all",
 ): SaveSessionPayload {
+  const unit = s.weightUnit ?? "kg";
+  const weightKg = (set: DraftSet) => draftWeightKg(set, unit);
   return {
     id: s.sessionId,
     template_id: s.templateId,
@@ -211,7 +242,7 @@ export function toSavePayload(
                 }
               : {
                   set_number: i + 1,
-                  weight: parseWeight(set.weight),
+                  weight: weightKg(set),
                   reps: parseReps(set.reps),
                   duration_seconds: null,
                   incline: null,

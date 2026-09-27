@@ -7,13 +7,16 @@ import { Label } from "@/components/ui/label";
 import { ResponsiveModal } from "@/components/common/ResponsiveModal";
 import type { ExerciseInput } from "@/lib/repositories/exercises";
 import { cn } from "@/lib/utils";
+import type { MuscleGroup } from "@/lib/muscleGroups";
+import { MuscleGroupPicker } from "./MuscleGroupChips";
+import { errorMessage } from "@/lib/repositories/errors";
 
 const KINDS = [
   { value: "strength", label: "Strength", hint: "Weight × reps" },
   { value: "timed", label: "Timed", hint: "Duration, e.g. treadmill, plank" },
 ] as const;
 
-/** Create or edit an exercise: name, type, and (for timed) incline tracking. */
+/** Create or edit an exercise: name, type, (for timed) incline tracking, and muscle groups. */
 export function ExerciseDialog({
   open,
   onOpenChange,
@@ -59,6 +62,7 @@ function ExerciseForm({
   const [name, setName] = useState(initial?.name ?? "");
   const [kind, setKind] = useState<ExerciseInput["kind"]>(initial?.kind ?? "strength");
   const [trackIncline, setTrackIncline] = useState(initial?.trackIncline ?? false);
+  const [muscleGroups, setMuscleGroups] = useState<MuscleGroup[]>(initial?.muscleGroups ?? []);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -71,9 +75,9 @@ function ExerciseForm({
         setPending(true);
         setError(null);
         try {
-          await onSubmit({ name, kind, trackIncline });
+          await onSubmit({ name, kind, trackIncline, muscleGroups });
         } catch (err) {
-          setError(err instanceof Error ? err.message : "Something went wrong.");
+          setError(errorMessage(err, "Couldn’t save exercise"));
           setPending(false);
         }
       }}
@@ -103,7 +107,7 @@ function ExerciseForm({
               onClick={() => setKind(k.value)}
               className={cn(
                 "rounded-xl px-3 py-2.5 text-left outline-none ring-inset transition-colors focus-visible:ring-2 focus-visible:ring-primary",
-                kind === k.value ? "bg-primary/10 ring-2 ring-primary" : "bg-surface hover:bg-surface-2",
+                kind === k.value ? "bg-surface-2 ring-2 ring-foreground" : "bg-surface hover:bg-surface-2",
               )}
             >
               <span className="block text-sm font-medium">{k.label}</span>
@@ -131,18 +135,25 @@ function ExerciseForm({
             aria-hidden
             className={cn(
               "relative h-6 w-10 shrink-0 rounded-full transition-colors",
-              trackIncline ? "bg-primary" : "bg-input",
+              trackIncline ? "bg-foreground" : "bg-input",
             )}
           >
             <span
               className={cn(
-                "absolute top-0.5 size-5 rounded-full bg-white shadow transition-[left]",
-                trackIncline ? "left-[18px]" : "left-0.5",
+                "absolute top-0.5 size-5 rounded-full shadow transition-[left]",
+                trackIncline ? "left-[18px] bg-background" : "left-0.5 bg-white",
               )}
             />
           </span>
         </button>
       )}
+
+      <div className="flex flex-col gap-2">
+        <Label id="exercise-groups">
+          Muscle groups <span className="font-normal text-muted-foreground">(optional)</span>
+        </Label>
+        <MuscleGroupPicker value={muscleGroups} onChange={setMuscleGroups} labelledBy="exercise-groups" />
+      </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
       <Button type="submit" size="cta" disabled={pending || !name.trim()}>

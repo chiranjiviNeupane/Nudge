@@ -1,5 +1,5 @@
 // Remembers which screen opened an exercise's history, so its header link
-// can return there. Recorded at tap time (sessionStorage) in addition to the
+// can return there. Saved at tap time (sessionStorage) in addition to the
 // `?from=` URL param, because the client router can reuse a cached page
 // without the param.
 

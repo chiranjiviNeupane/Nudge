@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Flag, MoreHorizontal, Plus, Trash2 } from "lucide-react";
@@ -16,7 +16,11 @@ import { FullScreenSpinner } from "@/components/providers/SessionProvider";
 import { ResponsiveModal } from "@/components/common/ResponsiveModal";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { ExercisePicker } from "@/components/exercises/ExercisePicker";
-import { ExerciseBlock, type ExerciseActions } from "@/components/workout/ExerciseBlock";
+import { ExerciseBlock } from "@/components/workout/ExerciseBlock";
+import { SetFieldBar } from "@/components/workout/SetFieldBar";
+import { saveFinishSummary } from "@/components/workout/finishSummaryStore";
+import { summarizeFinish } from "@/lib/workout/progress";
+import { useDraftActions } from "@/components/workout/useDraftActions";
 import { FinishDialog } from "@/components/workout/FinishDialog";
 import type { ActiveSession } from "@/lib/db/types";
 import {
@@ -29,6 +33,7 @@ import {
 import * as ops from "@/lib/workout/draftOps";
 import { touch } from "@/lib/workout/staleness";
 import { pluralize } from "@/lib/format";
+import { errorMessage } from "@/lib/repositories/errors";
 
 export default function WorkoutPage() {
   const router = useRouter();
@@ -74,18 +79,7 @@ export default function WorkoutPage() {
     if (session) void putActiveSession(session);
   }, [session]);
 
-  const actions: ExerciseActions = useMemo(() => {
-    const apply = (fn: (s: ActiveSession) => ActiveSession) =>
-      setSession((s) => (s ? touch(fn(s)) : s));
-    return {
-      updateSet: (exId, setId, patch) => apply((s) => ops.updateSet(s, exId, setId, patch)),
-      addSet: (exId) => apply((s) => ops.addSet(s, exId)),
-      removeSet: (exId, setId) => apply((s) => ops.removeSet(s, exId, setId)),
-      setSkipped: (exId, skipped) => apply((s) => ops.setSkipped(s, exId, skipped)),
-      remove: (exId) => apply((s) => ops.removeExercise(s, exId)),
-      move: (exId, delta) => apply((s) => ops.moveExercise(s, exId, delta)),
-    };
-  }, []);
+  const actions = useDraftActions(session, setSession, touch);
 
   if (!session) return <FullScreenSpinner />;
 
@@ -95,13 +89,13 @@ export default function WorkoutPage() {
     if (!session) return;
     setFinishing(true);
     try {
-      await finishWorkout(session, new Date(), mode);
-      toast.success("Workout saved");
-      router.replace("/");
+      const payload = await finishWorkout(session, new Date(), mode);
+      saveFinishSummary(summarizeFinish(session, payload));
+      router.replace("/workout/done");
     } catch (e) {
       setFinishing(false);
       toast.error(
-        `${e instanceof Error ? e.message : "Could not save"}. Your workout is still kept on this device. Try again.`,
+        `${errorMessage(e, "Couldn’t save workout")} Your workout is safe on this device.`,
       );
     }
   }
@@ -144,7 +138,7 @@ export default function WorkoutPage() {
         {/* Progress: sets ticked off today. */}
         <div className="-mb-px h-0.5 w-full" role="progressbar" aria-label="Sets done" aria-valuemin={0} aria-valuemax={summary.totalSets} aria-valuenow={summary.doneSets}>
           <div
-            className="h-full bg-primary transition-[width] duration-300"
+            className="h-full bg-foreground transition-[width] duration-300"
             style={{ width: `${summary.totalSets ? (summary.doneSets / summary.totalSets) * 100 : 0}%` }}
           />
         </div>
@@ -159,6 +153,7 @@ export default function WorkoutPage() {
               index={i}
               isLast={i === session.exercises.length - 1}
               actions={actions}
+              unit={session.weightUnit ?? "kg"}
             />
           ))}
         </div>
@@ -180,7 +175,7 @@ export default function WorkoutPage() {
         </Button>
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 bg-gradient-to-t from-background from-70% to-transparent pt-5 pb-safe">
+      <div data-hide-on-keyboard className="fixed inset-x-0 bottom-0 z-30 bg-gradient-to-t from-background from-70% to-transparent pt-5 pb-safe">
         <div className="mx-auto max-w-2xl px-4 pb-3 md:px-6">
           <Button
             size="cta"
@@ -197,11 +192,13 @@ export default function WorkoutPage() {
         </div>
       </div>
 
-      <ResponsiveModal open={adding} onOpenChange={setAdding} title="Add exercise" description="Only for today. Your workout template won’t change.">
+      <SetFieldBar />
+
+      <ResponsiveModal open={adding} onOpenChange={setAdding} title="Add exercise" description="Just for today. Your routine stays the same.">
         <ExercisePicker
           excludeIds={session.exercises.map((e) => e.exerciseId)}
           onPick={async (exercise) => {
-            const draft = await buildAddedExercise(exercise);
+            const draft = await buildAddedExercise(exercise, session);
             setSession((s) => (s ? touch(ops.addExercise(s, draft)) : s));
             setAdding(false);
             // Bring the new exercise into view.

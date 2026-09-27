@@ -6,19 +6,24 @@ import { cn } from "@/lib/utils";
 import type { DraftSet, ExerciseKind } from "@/lib/db/types";
 import { formatDuration } from "@/lib/format";
 import { parseDuration } from "@/lib/workout/draftOps";
+import type { WeightUnit } from "@/lib/units";
+import { focusNextField, stepField } from "./setFields";
 
-/** Column layout shared by the header row and each set row. */
-export function setGrid(kind: ExerciseKind, trackIncline: boolean) {
+/** Column layout shared by the header row and each set row. `showDone` adds the tick column. */
+export function setGrid(kind: ExerciseKind, trackIncline: boolean, showDone = true) {
   const twoFields = kind === "strength" || trackIncline;
-  return cn(
-    "grid items-center gap-2",
-    twoFields ? "grid-cols-[1.75rem_1fr_1fr_3rem_2rem]" : "grid-cols-[1.75rem_1fr_3rem_2rem]",
-  );
+  const cols = {
+    "two-done": "grid-cols-[1.75rem_1fr_1fr_3rem_2.5rem]",
+    "one-done": "grid-cols-[1.75rem_1fr_3rem_2.5rem]",
+    two: "grid-cols-[1.75rem_1fr_1fr_2.5rem]",
+    one: "grid-cols-[1.75rem_1fr_2.5rem]",
+  } as const;
+  return cn("grid items-center gap-2", cols[`${twoFields ? "two" : "one"}${showDone ? "-done" : ""}`]);
 }
 
 /** Header labels for the value columns. */
-export function setColumns(kind: ExerciseKind, trackIncline: boolean): string[] {
-  if (kind === "strength") return ["kg", "Reps"];
+export function setColumns(kind: ExerciseKind, trackIncline: boolean, unit: WeightUnit): string[] {
+  if (kind === "strength") return [unit, "Reps"];
   return trackIncline ? ["Time", "Incline %"] : ["Time"];
 }
 
@@ -27,35 +32,48 @@ type Props = {
   set: DraftSet;
   kind: ExerciseKind;
   trackIncline: boolean;
+  unit: WeightUnit;
+  /** The done tick is for the live workout; editing a finished one hides it. */
+  showDone: boolean;
+  /** "+2.5 kg" when this set beats the same set last time (live workout only). */
+  delta?: string | null;
+  /** Beats the all-time best. */
+  pr?: boolean;
   /** Hints shown when a field is empty (from the first set of last session). */
   placeholders?: { a?: string; b?: string };
   onChange: (setId: string, patch: Partial<Omit<DraftSet, "id">>) => void;
   onRemove: (setId: string) => void;
 };
 
-/** Moves focus to the next set field (Enter key), in document order. */
-function focusNextField(current: HTMLElement) {
-  const fields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-set-field]"));
-  const next = fields[fields.indexOf(current as HTMLInputElement) + 1];
-  if (next) next.focus();
-  else current.blur();
-}
-
-function SetRowImpl({ index, set, kind, trackIncline, placeholders, onChange, onRemove }: Props) {
+function SetRowImpl({
+  index,
+  set,
+  kind,
+  trackIncline,
+  unit,
+  showDone,
+  delta,
+  pr,
+  placeholders,
+  onChange,
+  onRemove,
+}: Props) {
+  const done = showDone && set.completed;
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
       focusNextField(e.currentTarget);
+    } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      e.preventDefault();
+      stepField(e.currentTarget, e.key === "ArrowUp" ? 1 : -1);
     }
   };
 
   const inputClass = cn(
     "numeric h-12 w-full min-w-0 rounded-xl bg-surface text-center text-xl outline-none ring-inset transition-shadow placeholder:font-normal placeholder:text-muted-foreground/40 focus-visible:ring-2 focus-visible:ring-primary",
-    set.completed && "bg-primary/10",
   );
 
   const common = {
-    "data-set-field": true,
     type: "text",
     enterKeyHint: "next" as const,
     autoComplete: "off",
@@ -66,9 +84,9 @@ function SetRowImpl({ index, set, kind, trackIncline, placeholders, onChange, on
   const n = index + 1;
 
   return (
-    <div className={setGrid(kind, trackIncline)}>
+    <div className={setGrid(kind, trackIncline, showDone)}>
       <span
-        className={cn("numeric text-center text-sm", set.completed ? "text-primary" : "text-muted-foreground")}
+        className={cn("numeric text-center text-sm", done ? "text-foreground" : "text-muted-foreground")}
       >
         {n}
       </span>
@@ -77,14 +95,17 @@ function SetRowImpl({ index, set, kind, trackIncline, placeholders, onChange, on
         <>
           <input
             {...common}
+            data-set-field="weight"
+            data-unit={unit}
             inputMode="decimal"
-            aria-label={`Set ${n} weight in kg`}
+            aria-label={`Set ${n} weight in ${unit}`}
             value={set.weight}
             placeholder={placeholders?.a ?? "0"}
             onChange={(e) => onChange(set.id, { weight: e.target.value.replace(/[^\d.,]/g, "") })}
           />
           <input
             {...common}
+            data-set-field="reps"
             inputMode="numeric"
             aria-label={`Set ${n} reps`}
             value={set.reps}
@@ -96,6 +117,7 @@ function SetRowImpl({ index, set, kind, trackIncline, placeholders, onChange, on
         <>
           <input
             {...common}
+            data-set-field="duration"
             inputMode="decimal"
             aria-label={`Set ${n} time in minutes (mm:ss)`}
             value={set.duration ?? ""}
@@ -110,6 +132,7 @@ function SetRowImpl({ index, set, kind, trackIncline, placeholders, onChange, on
           {trackIncline && (
             <input
               {...common}
+              data-set-field="incline"
               inputMode="decimal"
               aria-label={`Set ${n} incline in percent`}
               value={set.incline ?? ""}
@@ -120,28 +143,45 @@ function SetRowImpl({ index, set, kind, trackIncline, placeholders, onChange, on
         </>
       )}
 
-      <button
-        type="button"
-        aria-label={set.completed ? `Mark set ${n} not done` : `Mark set ${n} done`}
-        aria-pressed={set.completed}
-        onClick={() => onChange(set.id, { completed: !set.completed })}
-        className={cn(
-          "flex h-12 w-full items-center justify-center rounded-xl outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary",
-          set.completed
-            ? "bg-primary text-primary-foreground"
-            : "bg-surface text-muted-foreground/50 hover:text-foreground",
-        )}
-      >
-        <Check className="size-5" strokeWidth={2.5} />
-      </button>
+      {showDone && (
+        <button
+          type="button"
+          aria-label={set.completed ? `Mark set ${n} not done` : `Mark set ${n} done`}
+          aria-pressed={set.completed}
+          onClick={() => {
+            // A tiny tap of feedback when ticking off (Android; iOS ignores it).
+            if (!set.completed) navigator.vibrate?.(12);
+            onChange(set.id, { completed: !set.completed });
+          }}
+          className={cn(
+            "flex h-12 w-full items-center justify-center rounded-xl outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary",
+            set.completed
+              ? "bg-foreground text-background motion-safe:animate-tick-pop"
+              : "bg-surface text-muted-foreground/50 hover:text-foreground",
+          )}
+        >
+          <Check className="size-5" strokeWidth={2.5} />
+        </button>
+      )}
       <button
         type="button"
         aria-label={`Remove set ${n}`}
         onClick={() => onRemove(set.id)}
-        className="flex size-8 items-center justify-center rounded-lg text-muted-foreground/40 outline-none hover:bg-surface hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary"
+        className="flex h-12 w-full items-center justify-center rounded-xl text-muted-foreground/40 outline-none hover:bg-surface hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary"
       >
         <X className="size-4" />
       </button>
+
+      {(delta || pr) && (
+        <p className="col-span-full -mt-1 flex items-center gap-2 pl-9 text-xs font-medium text-success">
+          {delta && <span>↑ {delta} vs last</span>}
+          {pr && (
+            <span className="rounded-sm bg-gold px-1.5 py-px text-[10px] font-semibold tracking-wide text-gold-foreground motion-safe:animate-pr-pulse">
+              PR
+            </span>
+          )}
+        </p>
+      )}
     </div>
   );
 }

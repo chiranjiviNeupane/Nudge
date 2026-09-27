@@ -1,8 +1,10 @@
 import { formatSet, formatShortDate } from "@/lib/format";
 import type { HistoryEntry } from "@/lib/db/types";
+import { useWeightUnit } from "@/lib/preferences";
 
 /** Every logged session for one exercise, newest first. */
 export function HistoryList({ entries }: { entries: HistoryEntry[] }) {
+  const unit = useWeightUnit();
   return (
     <ol className="divide-y">
       {entries.map((entry) => (
@@ -11,14 +13,15 @@ export function HistoryList({ entries }: { entries: HistoryEntry[] }) {
             <h3 className="font-semibold">{formatShortDate(entry.completed_at)}</h3>
             <span className="truncate text-xs text-muted-foreground">{entry.session_name}</span>
           </div>
-          <ul className="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-x-4 gap-y-0.5 tabular-nums">
-            {entry.sets.map((set) => (
-              <li key={set.set_number} className="flex gap-2">
-                <span className="w-4 text-right text-xs leading-6 text-muted-foreground">{set.set_number}</span>
-                <span className="leading-6">{formatSet(set, false)}</span>
-              </li>
+          {/* Sets in order, like the workout summary; wraps between sets, never inside one. */}
+          <p className="leading-6 tabular-nums">
+            {entry.sets.map((set, i) => (
+              <span key={set.set_number} className="whitespace-nowrap">
+                {i > 0 && <span className="text-muted-foreground/50"> · </span>}
+                {formatSet(set, unit)}
+              </span>
             ))}
-          </ul>
+          </p>
         </li>
       ))}
     </ol>

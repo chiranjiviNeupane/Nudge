@@ -16,6 +16,7 @@ import { discardActiveSession, finishWorkout } from "@/lib/repositories/activeSe
 import { isStale, lastActivity } from "@/lib/workout/staleness";
 import { finishChoice, summarize, type SaveMode } from "@/lib/workout/draftOps";
 import { formatRelativeDay, pluralize } from "@/lib/format";
+import { errorMessage } from "@/lib/repositories/errors";
 
 // Drafts the user chose to resume stay quiet for the rest of this page load.
 const dismissed = new Set<string>();
@@ -69,7 +70,7 @@ export function StaleWorkoutPrompt() {
       await finishWorkout(active, last, mode);
       toast.success(`Saved ${active.name}`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save");
+      toast.error(errorMessage(e, "Couldn’t save workout"));
     } finally {
       setBusy(false);
     }
@@ -79,7 +80,7 @@ export function StaleWorkoutPrompt() {
     <AlertDialog open>
       <AlertDialogContent className="data-[size=default]:max-w-sm">
         <AlertDialogHeader>
-          <p className="text-sm font-medium text-primary">Unfinished workout</p>
+          <p className="text-sm font-medium text-muted-foreground">Unfinished workout</p>
           <AlertDialogTitle className="display text-xl">{active.name}</AlertDialogTitle>
           <AlertDialogDescription>
             Last updated {when}.{" "}
@@ -93,16 +94,17 @@ export function StaleWorkoutPrompt() {
         <div className="flex flex-col gap-2">
           {loggedSets > 0 && !mixed && (
             <Button size="cta" disabled={busy} onClick={() => save("all")}>
-              {busy ? "Saving…" : "Save it"}
+              {busy ? "Saving…" : "Save workout"}
             </Button>
           )}
           {mixed && (
             <>
-              <Button size="cta" disabled={busy} onClick={() => save("all")}>
-                Save all {loggedSets} sets
+              {/* Same order and emphasis as the Finish dialog. */}
+              <Button size="cta" disabled={busy} onClick={() => save("ticked")}>
+                Only the {tickedLogged} I did
               </Button>
-              <Button size="cta" variant="secondary" disabled={busy} onClick={() => save("ticked")}>
-                Save only the {tickedLogged} I did
+              <Button size="cta" variant="secondary" disabled={busy} onClick={() => save("all")}>
+                Save all {loggedSets} sets
               </Button>
             </>
           )}

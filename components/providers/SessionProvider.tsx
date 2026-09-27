@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { getCurrentUser, type CurrentUser } from "@/lib/auth/auth";
 import { Spinner } from "@/components/layout/Page";
 import { ensureLocalUser, hasSynced, refreshAll } from "@/lib/sync/refresh";
+import { setLocalPreferences } from "@/lib/preferences";
+import { migrateLegacyDatabase } from "@/lib/db/dexie";
+import { errorMessage } from "@/lib/repositories/errors";
 
 type SessionState = {
   user: CurrentUser;
@@ -44,7 +47,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         setSyncError(null);
         setReady(true);
       } catch (e) {
-        setSyncError(e instanceof Error ? e.message : "Sync failed");
+        setSyncError(errorMessage(e, "Couldn’t sync"));
       } finally {
         setSyncing(false);
         inFlight.current = null;
@@ -63,7 +66,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         router.replace("/login");
         return;
       }
+      // Before anything reads the cache: bring over data from the old database name, once.
+      await migrateLegacyDatabase();
+      if (cancelled) return;
       await ensureLocalUser(current.id);
+      setLocalPreferences(current.preferences);
       if (cancelled) return;
       setUser(current);
       // Show cached data immediately if we have it; refresh in the background.

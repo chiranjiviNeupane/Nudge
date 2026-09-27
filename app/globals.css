@@ -33,6 +33,12 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-gold: var(--gold);
+  --color-gold-foreground: var(--gold-foreground);
+  --color-gold-ink: var(--gold-ink);
+  --animate-tick-pop: tick-pop 180ms ease-out;
+  --animate-pr-pulse: pr-pulse 700ms ease-out;
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -64,7 +70,7 @@
   --card-foreground: #0f1114;
   --popover: #ffffff;
   --popover-foreground: #0f1114;
-  --primary: #2f5bea;
+  --primary: #2f52c6;
   --primary-foreground: #ffffff;
   --secondary: #eeeff2;
   --secondary-foreground: #0f1114;
@@ -73,10 +79,15 @@
   --accent: #eeeff2;
   --accent-foreground: #0f1114;
   --destructive: #dc3545;
+  /* Improvement ("vs last") and PRs. Reserved: never a series or a button colour. */
+  --success: #1c7d3f;
+  --gold: #f6b828;
+  --gold-foreground: #2b1d00;
+  --gold-ink: #b3770f;
   --border: #e4e5e8;
   --input: #d9dbe0;
-  --ring: #2f5bea;
-  --chart-1: #2f5bea;
+  --ring: #2f52c6;
+  --chart-1: #2f52c6;
   --chart-2: #6b7079;
   --chart-3: #9aa0aa;
   --chart-4: #3a3f47;
@@ -84,12 +95,12 @@
   --radius: 0.75rem;
   --sidebar: #f2f3f5;
   --sidebar-foreground: #0f1114;
-  --sidebar-primary: #2f5bea;
+  --sidebar-primary: #2f52c6;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #e7e8eb;
   --sidebar-accent-foreground: #0f1114;
   --sidebar-border: #e4e5e8;
-  --sidebar-ring: #2f5bea;
+  --sidebar-ring: #2f52c6;
 }
 
 /* Dark: graphite */
@@ -102,7 +113,7 @@
   --card-foreground: #f2f3f5;
   --popover: #16181c;
   --popover-foreground: #f2f3f5;
-  --primary: #3b6cff;
+  --primary: #4b6ddd;
   --primary-foreground: #ffffff;
   --secondary: #1b1d22;
   --secondary-foreground: #f2f3f5;
@@ -111,22 +122,26 @@
   --accent: #1e2126;
   --accent-foreground: #f2f3f5;
   --destructive: #f2555a;
+  --success: #59cf84;
+  --gold: #f2ba36;
+  --gold-foreground: #2b1d00;
+  --gold-ink: #f2ba36;
   --border: #23262c;
   --input: #2c3037;
-  --ring: #3b6cff;
-  --chart-1: #3b6cff;
+  --ring: #4b6ddd;
+  --chart-1: #4b6ddd;
   --chart-2: #8b9099;
   --chart-3: #5b6069;
   --chart-4: #2c3037;
   --chart-5: #f2f3f5;
   --sidebar: #0e0f12;
   --sidebar-foreground: #f2f3f5;
-  --sidebar-primary: #3b6cff;
+  --sidebar-primary: #4b6ddd;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #1b1d22;
   --sidebar-accent-foreground: #f2f3f5;
   --sidebar-border: #1d2025;
-  --sidebar-ring: #3b6cff;
+  --sidebar-ring: #4b6ddd;
 }
 
 @layer base {
@@ -171,4 +186,21 @@
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   letter-spacing: -0.01em;
+}
+
+/* Fixed bottom bars would sit on top of (or behind) the on-screen keyboard. */
+html[data-keyboard] [data-hide-on-keyboard] {
+  display: none;
+}
+
+/* A ticked set's check pops; a new PR badge pulses once. Used with motion-safe: only. */
+@keyframes tick-pop {
+  0% { transform: scale(0.85); }
+  60% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+@keyframes pr-pulse {
+  0% { transform: scale(0.6); opacity: 0; }
+  50% { transform: scale(1.25); opacity: 1; }
+  100% { transform: scale(1); }
 }

@@ -1,19 +1,40 @@
 import { db } from "@/lib/db/dexie";
+import type { MuscleGroup } from "@/lib/muscleGroups";
 import { findOrCreateExercise } from "./exercises";
 import { saveTemplate } from "./templates";
 
-export const EXAMPLE_ROUTINES: { name: string; exercises: string[] }[] = [
+type Example = [name: string, groups: MuscleGroup[]];
+
+export const EXAMPLE_ROUTINES: { name: string; exercises: Example[] }[] = [
   {
     name: "Push Day",
-    exercises: ["Bench Press", "Incline Dumbbell Press", "Shoulder Press", "Lateral Raise", "Tricep Pushdown"],
+    exercises: [
+      ["Bench Press", ["chest", "arms"]],
+      ["Incline Dumbbell Press", ["chest", "shoulders"]],
+      ["Shoulder Press", ["shoulders", "arms"]],
+      ["Lateral Raise", ["shoulders"]],
+      ["Tricep Pushdown", ["arms"]],
+    ],
   },
   {
     name: "Pull Day",
-    exercises: ["Pull Up", "Barbell Row", "Lat Pulldown", "Face Pull", "Bicep Curl"],
+    exercises: [
+      ["Pull Up", ["back", "arms"]],
+      ["Barbell Row", ["back"]],
+      ["Lat Pulldown", ["back"]],
+      ["Face Pull", ["shoulders", "back"]],
+      ["Bicep Curl", ["arms"]],
+    ],
   },
   {
     name: "Leg Day",
-    exercises: ["Squat", "Leg Press", "Romanian Deadlift", "Leg Extension", "Leg Curl"],
+    exercises: [
+      ["Squat", ["legs", "core"]],
+      ["Leg Press", ["legs"]],
+      ["Romanian Deadlift", ["legs", "back"]],
+      ["Leg Extension", ["legs"]],
+      ["Leg Curl", ["legs"]],
+    ],
   },
 ];
 
@@ -24,7 +45,7 @@ export async function addExampleRoutines(): Promise<number> {
   for (const routine of EXAMPLE_ROUTINES) {
     if (existing.has(routine.name.toLowerCase())) continue;
     const exercises = [];
-    for (const name of routine.exercises) exercises.push(await findOrCreateExercise(name));
+    for (const [name, groups] of routine.exercises) exercises.push(await findOrCreateExercise(name, groups));
     await saveTemplate(
       null,
       routine.name,

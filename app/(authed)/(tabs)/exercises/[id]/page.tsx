@@ -15,18 +15,26 @@ import { EmptyState, Page, PageHeader, Spinner } from "@/components/layout/Page"
 import { ExerciseDialog } from "@/components/exercises/ExerciseDialog";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { HistoryList } from "@/components/exercises/HistoryList";
+import { ProgressChart } from "@/components/exercises/ProgressChart";
 import { useExercise, useExerciseHistory } from "@/lib/hooks/data";
 import { deleteExercise, refreshExerciseHistory, updateExercise } from "@/lib/repositories/exercises";
 import { parseReturnParams, readReturn, RETURN_TO_EXERCISES } from "@/lib/navigation/returnTo";
+import { formatMuscleGroups } from "@/lib/muscleGroups";
+import { useIsWide } from "@/lib/hooks/useMediaQuery";
+import { HeaderSkeleton, Skeleton } from "@/components/layout/Skeleton";
+import { errorMessage } from "@/lib/repositories/errors";
 
 export default function ExerciseDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   // Opened from the live workout: the header link should return there, not to
-  // the library. URL param first; tap-time record as fallback (see returnTo.ts).
+  // the library. URL param first; tap-time note as fallback (see returnTo.ts).
   const fromUrl = parseReturnParams(useSearchParams());
   const remembered = useMemo(() => readReturn(id), [id]);
-  const back = fromUrl ?? remembered ?? RETURN_TO_EXERCISES;
+  const target = fromUrl ?? remembered ?? RETURN_TO_EXERCISES;
+  // On wide screens the library is already beside this page, so "‹ Exercises" is redundant.
+  const wide = useIsWide();
+  const back = wide && target.href === RETURN_TO_EXERCISES.href ? undefined : target;
   const exercise = useExercise(id);
   const history = useExerciseHistory(id);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -35,11 +43,22 @@ export default function ExerciseDetailPage() {
 
   useEffect(() => {
     refreshExerciseHistory(id).catch((e) =>
-      setLoadError(e instanceof Error ? e.message : "Could not load history"),
+      setLoadError(errorMessage(e, "Couldn’t load history")),
     );
   }, [id]);
 
-  if (exercise === undefined) return null;
+  if (exercise === undefined) {
+    return (
+      <Page wide>
+        <HeaderSkeleton />
+        <div className="mb-8 grid grid-cols-2 gap-3">
+          <Skeleton className="h-24 rounded-2xl" />
+          <Skeleton className="h-24 rounded-2xl" />
+        </div>
+        <Skeleton className="h-56 rounded-2xl" />
+      </Page>
+    );
+  }
   if (exercise === null) {
     return (
       <Page>
@@ -56,6 +75,7 @@ export default function ExerciseDetailPage() {
         title={exercise.name}
         subtitle={[
           exercise.kind === "timed" ? (exercise.track_incline ? "Timed · incline" : "Timed") : "Strength",
+          formatMuscleGroups(exercise.muscle_groups) || null,
           history ? `${sessions} session${sessions === 1 ? "" : "s"}` : null,
         ]
           .filter(Boolean)
@@ -95,21 +115,29 @@ export default function ExerciseDetailPage() {
           <p className="text-sm text-muted-foreground">Sets you log in a workout will show up here.</p>
         </EmptyState>
       ) : (
-        <HistoryList entries={history.entries} />
+        <>
+          <ProgressChart entries={history.entries} />
+          <HistoryList entries={history.entries} />
+        </>
       )}
 
       <ExerciseDialog
         open={editing}
         onOpenChange={setEditing}
         title="Edit exercise"
-        initial={{ name: exercise.name, kind: exercise.kind, trackIncline: exercise.track_incline }}
+        initial={{
+          name: exercise.name,
+          kind: exercise.kind,
+          trackIncline: exercise.track_incline,
+          muscleGroups: exercise.muscle_groups ?? [],
+        }}
         onSubmit={(input) => updateExercise(exercise.id, input)}
       />
       <ConfirmDialog
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
         title={`Delete ${exercise.name}?`}
-        description="Only exercises that aren't used in any workout or history can be deleted."
+        description="This can’t be undone. Exercises used in a routine or in your history can’t be deleted."
         confirmLabel="Delete"
         destructive
         onConfirm={async () => {
@@ -117,7 +145,7 @@ export default function ExerciseDetailPage() {
             await deleteExercise(exercise.id);
             router.replace("/exercises");
           } catch (e) {
-            toast.error(e instanceof Error ? e.message : "Could not delete");
+            toast.error(errorMessage(e, "Couldn’t delete exercise"));
           }
         }}
       />

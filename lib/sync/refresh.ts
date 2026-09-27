@@ -1,7 +1,8 @@
 import { db, clearLocalData } from "@/lib/db/dexie";
 import { fetchExercises } from "@/lib/repositories/exercises";
 import { fetchTemplates } from "@/lib/repositories/templates";
-import { fetchLastSessions, fetchRecentSessions } from "@/lib/repositories/sessions";
+import { fetchActivity, fetchBests, fetchLastSessions, fetchRecentSessions } from "@/lib/repositories/sessions";
+import { syncPreferences } from "@/lib/auth/auth";
 
 // Pulls the user's data from Supabase into IndexedDB. Called on app load,
 // when the tab regains focus, and when the device comes back online.
@@ -23,11 +24,17 @@ export async function hasSynced(): Promise<boolean> {
   return !!(await db.meta.get(SYNCED_KEY));
 }
 
+export const ACTIVITY_KEY = "activity";
+const ACTIVITY_WEEKS = 53;
+
+/** Recent workouts (Home) and the last year's workout dates (weekly goal, streak). */
 export async function refreshRecentSessions(): Promise<void> {
-  const recent = await fetchRecentSessions();
-  await db.transaction("rw", db.recentSessions, async () => {
+  const since = new Date(Date.now() - ACTIVITY_WEEKS * 7 * 86_400_000);
+  const [recent, activity] = await Promise.all([fetchRecentSessions(), fetchActivity(since)]);
+  await db.transaction("rw", db.recentSessions, db.meta, async () => {
     await db.recentSessions.clear();
     await db.recentSessions.bulkPut(recent);
+    await db.meta.put({ key: ACTIVITY_KEY, value: JSON.stringify(activity) });
   });
 }
 
@@ -48,9 +55,13 @@ export async function refreshAll(): Promise<void> {
 
   // Prefetch "last session" for every exercise so starting a workout is instant
   // (and works from cache if the gym has no signal).
+  const ids = exercises.map((e) => e.id);
   await Promise.all([
-    fetchLastSessions(exercises.map((e) => e.id)),
+    fetchLastSessions(ids),
+    // Nice-to-have (PR badges): never let it fail the whole sync.
+    fetchBests(ids).catch(() => undefined),
     refreshRecentSessions(),
+    syncPreferences(),
   ]);
 
   await db.meta.put({ key: SYNCED_KEY, value: new Date().toISOString() });

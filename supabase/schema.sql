@@ -1,6 +1,5 @@
--- Record — complete database schema.
--- Run once, in full, in the Supabase SQL editor of a NEW project.
--- (The existing project already has all of this.)
+-- Nudge — complete database schema.
+-- Run once, in full, in the SQL editor of a new, empty Supabase project.
 --
 -- Every table carries user_id (defaulting to auth.uid()) so Row Level Security
 -- is a simple equality check. Child tables use composite foreign keys
@@ -25,7 +24,8 @@ $$;
 -- ---------------------------------------------------------------------------
 -- Exercises
 -- kind: 'strength' (weight × reps) or 'timed' (duration)
--- track_incline: timed exercises that also record incline (treadmill, hill)
+-- track_incline: timed exercises that also track incline (treadmill, hill)
+-- muscle_groups: fixed tags for filtering the library
 -- ---------------------------------------------------------------------------
 
 create table public.exercises (
@@ -34,6 +34,10 @@ create table public.exercises (
   name text not null check (char_length(btrim(name)) between 1 and 100),
   kind text not null default 'strength' check (kind in ('strength', 'timed')),
   track_incline boolean not null default false,
+  muscle_groups text[] not null default '{}'
+    constraint exercises_muscle_groups_check check (
+      muscle_groups <@ array['chest', 'back', 'shoulders', 'arms', 'legs', 'core', 'cardio', 'full_body']
+    ),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (id, user_id)
@@ -229,6 +233,40 @@ as $$
 $$;
 
 -- ---------------------------------------------------------------------------
+-- RPC: all-time bests per exercise (PR badges). Epley e1RM: w × (1 + reps/30), 1 rep = w.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.get_exercise_bests(p_exercise_ids uuid[])
+returns table (
+  exercise_id uuid,
+  best_e1rm numeric,
+  best_weight numeric,
+  best_reps integer,
+  best_duration integer
+)
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  select
+    se.exercise_id,
+    round(max(case when s.reps = 1 then s.weight else s.weight * (1 + s.reps / 30.0) end)
+      filter (where s.weight > 0 and s.reps > 0), 2),
+    max(s.weight) filter (where s.weight > 0 and s.reps > 0),
+    max(s.reps) filter (where s.weight is null and s.reps > 0),
+    max(s.duration_seconds)
+  from public.sets s
+  join public.session_exercises se on se.id = s.session_exercise_id
+  join public.workout_sessions ws on ws.id = se.session_id
+  where se.user_id = (select auth.uid())
+    and se.exercise_id = any (p_exercise_ids)
+    and ws.status = 'completed'
+    and se.status <> 'skipped'
+  group by se.exercise_id;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- RPC: save a finished session atomically. Idempotent on the session id so a
 -- retried request (e.g. from a future offline outbox) never duplicates data.
 --
@@ -289,6 +327,49 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
+-- RPC: edit a finished session: rename it and replace its exercises and sets
+-- (same payload shape as save_session; started/completed times are kept).
+-- ---------------------------------------------------------------------------
+
+create or replace function public.update_session(p jsonb)
+returns uuid
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_session_id uuid := (p ->> 'id')::uuid;
+begin
+  update public.workout_sessions
+  set name = coalesce(nullif(btrim(p ->> 'name'), ''), name)
+  where id = v_session_id and status = 'completed';
+  if not found then
+    raise exception 'Workout not found' using errcode = 'P0002';
+  end if;
+
+  -- Replace the whole snapshot; sets cascade with their exercises.
+  delete from public.session_exercises where session_id = v_session_id;
+
+  insert into public.session_exercises (id, session_id, exercise_id, position, status)
+  select (e.v ->> 'id')::uuid, v_session_id, (e.v ->> 'exercise_id')::uuid,
+         (e.v ->> 'position')::integer, e.v ->> 'status'
+  from jsonb_array_elements(coalesce(p -> 'exercises', '[]'::jsonb)) as e (v);
+
+  insert into public.sets (
+    session_exercise_id, set_number, weight, reps, duration_seconds, incline, notes, completed
+  )
+  select (e.v ->> 'id')::uuid, (s.v ->> 'set_number')::integer,
+         (s.v ->> 'weight')::numeric, (s.v ->> 'reps')::integer,
+         (s.v ->> 'duration_seconds')::integer, (s.v ->> 'incline')::numeric,
+         nullif(s.v ->> 'notes', ''), coalesce((s.v ->> 'completed')::boolean, false)
+  from jsonb_array_elements(coalesce(p -> 'exercises', '[]'::jsonb)) as e (v),
+       jsonb_array_elements(coalesce(e.v -> 'sets', '[]'::jsonb)) as s (v);
+
+  return v_session_id;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- RPC: create/update a template and replace its exercise list atomically
 -- (rename, add, remove, reorder, default sets — all in one call).
 --
@@ -320,6 +401,10 @@ $$;
 revoke execute on function public.get_last_sessions(uuid[]) from public, anon;
 revoke execute on function public.save_session(jsonb) from public, anon;
 revoke execute on function public.save_template(uuid, text, jsonb) from public, anon;
+revoke execute on function public.update_session(jsonb) from public, anon;
+revoke execute on function public.get_exercise_bests(uuid[]) from public, anon;
 grant execute on function public.get_last_sessions(uuid[]) to authenticated;
 grant execute on function public.save_session(jsonb) to authenticated;
 grant execute on function public.save_template(uuid, text, jsonb) to authenticated;
+grant execute on function public.update_session(jsonb) to authenticated;
+grant execute on function public.get_exercise_bests(uuid[]) to authenticated;

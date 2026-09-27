@@ -15,7 +15,9 @@ import { cn } from "@/lib/utils";
 import { LastSessionSummary } from "./LastSessionSummary";
 import { setColumns, setGrid, SetRow } from "./SetRow";
 import { kindOf } from "@/lib/workout/draftOps";
-import { formatDuration } from "@/lib/format";
+import { setProgress } from "@/lib/workout/progress";
+import { formatDuration, formatWeight } from "@/lib/format";
+import type { WeightUnit } from "@/lib/units";
 
 export type ExerciseActions = {
   updateSet: (exId: string, setId: string, patch: Partial<Omit<DraftSet, "id">>) => void;
@@ -31,12 +33,18 @@ function ExerciseBlockImpl({
   index,
   isLast,
   actions,
+  unit,
+  mode = "live",
 }: {
   exercise: DraftExercise;
   index: number;
   isLast: boolean;
   actions: ExerciseActions;
+  unit: WeightUnit;
+  /** "edit" is for fixing a finished workout: no last session, ticks or skipping. */
+  mode?: "live" | "edit";
 }) {
+  const live = mode === "live";
   const { id } = exercise;
   const onChange = useCallback(
     (setId: string, patch: Partial<Omit<DraftSet, "id">>) => actions.updateSet(id, setId, patch),
@@ -58,10 +66,16 @@ function ExerciseBlockImpl({
           b: first.incline != null ? String(first.incline) : undefined,
         }
       : {
-          a: first.weight != null ? String(first.weight) : undefined,
+          a: first.weight != null ? formatWeight(first.weight, unit) : undefined,
           b: first.reps != null ? String(first.reps) : undefined,
         };
-  }, [first, kind]);
+  }, [first, kind, unit]);
+
+  // "Beat last time" / PR markers, live workout only.
+  const progress = useMemo(
+    () => (live ? exercise.sets.map((_, i) => setProgress(exercise, i, unit)) : []),
+    [live, exercise, unit],
+  );
 
   const menu = (
     <DropdownMenu>
@@ -76,7 +90,7 @@ function ExerciseBlockImpl({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
-        {!exercise.skipped && (
+        {live && !exercise.skipped && (
           <DropdownMenuItem className="h-10" onSelect={() => actions.setSkipped(id, true)}>
             <SkipForward /> Skip today
           </DropdownMenuItem>
@@ -89,7 +103,7 @@ function ExerciseBlockImpl({
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem className="h-10" variant="destructive" onSelect={() => actions.remove(id)}>
-          <Trash2 /> Remove from today
+          <Trash2 /> {live ? "Remove from today" : "Remove"}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -102,7 +116,7 @@ function ExerciseBlockImpl({
           <h2 className="truncate font-medium text-muted-foreground line-through decoration-muted-foreground/40">
             {exercise.name}
           </h2>
-          <p className="text-xs text-muted-foreground">Skipped today</p>
+          <p className="text-xs text-muted-foreground">{live ? "Skipped today" : "Skipped"}</p>
         </div>
         <Button variant="secondary" className="h-9 px-3" onClick={() => actions.setSkipped(id, false)}>
           Undo
@@ -116,23 +130,25 @@ function ExerciseBlockImpl({
     <section className="py-5" aria-label={exercise.name}>
       <div className="flex items-center gap-2">
         <h2 className="display min-w-0 flex-1 truncate text-lg">{exercise.name}</h2>
-        <span className="numeric text-xs text-muted-foreground">
-          {done}/{exercise.sets.length}
-        </span>
+        {live && (
+          <span className="numeric text-xs text-muted-foreground">
+            {done}/{exercise.sets.length}
+          </span>
+        )}
         {menu}
       </div>
 
-      <LastSessionSummary exerciseId={exercise.exerciseId} last={exercise.last} />
+      {live && <LastSessionSummary exerciseId={exercise.exerciseId} last={exercise.last} unit={unit} />}
 
-      <div className="mt-3">
-        <div className={cn(setGrid(kind, trackIncline), "mb-1 text-xs text-muted-foreground")}>
+      <div className={live ? "mt-3" : "mt-2"}>
+        <div className={cn(setGrid(kind, trackIncline, live), "mb-1 text-xs text-muted-foreground")}>
           <span className="text-center">Set</span>
-          {setColumns(kind, trackIncline).map((label) => (
+          {setColumns(kind, trackIncline, unit).map((label) => (
             <span key={label} className="text-center">
               {label}
             </span>
           ))}
-          <span className="sr-only">Done</span>
+          {live && <span className="sr-only">Done</span>}
           <span className="sr-only">Remove</span>
         </div>
         <div className="flex flex-col gap-1.5">
@@ -143,6 +159,10 @@ function ExerciseBlockImpl({
               set={set}
               kind={kind}
               trackIncline={trackIncline}
+              unit={unit}
+              showDone={live}
+              delta={progress[i]?.delta}
+              pr={progress[i]?.pr}
               placeholders={placeholders}
               onChange={onChange}
               onRemove={onRemove}
@@ -151,7 +171,7 @@ function ExerciseBlockImpl({
         </div>
         <Button
           variant="ghost"
-          className="mt-1.5 -ml-2 h-10 px-2 text-sm font-medium text-primary hover:bg-primary/10 hover:text-primary"
+          className="mt-1.5 -ml-2 h-10 px-2 text-sm font-medium text-foreground hover:bg-surface hover:text-foreground"
           onClick={() => actions.addSet(id)}
         >
           <Plus /> Add set

@@ -1,8 +1,10 @@
 import type { LoggedSet } from "@/lib/db/types";
+import { fromKg, type WeightUnit } from "@/lib/units";
 
-export function formatWeight(weight: number | null): string {
+/** Stored kg → "80" / "176.4" in the chosen unit; null is bodyweight. */
+export function formatWeight(weight: number | null, unit: WeightUnit = "kg"): string {
   if (weight === null) return "BW";
-  return String(Number(weight));
+  return String(fromKg(Number(weight), unit));
 }
 
 /** 1800 → "30:00", 3905 → "1:05:05". */
@@ -14,16 +16,15 @@ export function formatDuration(totalSeconds: number): string {
 }
 
 /**
- * "80 kg × 10" / "BW × 10" for strength; "30:00 @ 8%" / "1:00" for timed.
+ * "80 × 10" / "BW × 10" for strength (weight in `unit`); "30:00 @ 8%" / "1:00" for timed.
  * Decided by the set's own data, so history stays readable if an exercise's type changes.
  */
-export function formatSet(set: LoggedSet, unit = true): string {
+export function formatSet(set: LoggedSet, unit: WeightUnit = "kg"): string {
   if (set.duration_seconds) {
     const t = formatDuration(set.duration_seconds);
     return set.incline != null ? `${t} @ ${Number(set.incline)}%` : t;
   }
-  const w = formatWeight(set.weight);
-  return set.weight === null || !unit ? `${w} × ${set.reps}` : `${w} kg × ${set.reps}`;
+  return `${formatWeight(set.weight, unit)} × ${set.reps}`;
 }
 
 /** "Sep 24", with the year appended when it isn't the current year. */

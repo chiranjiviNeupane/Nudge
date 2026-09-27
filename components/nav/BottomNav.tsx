@@ -9,10 +9,11 @@ import { NAV_ITEMS, isActive } from "./navItems";
 export function BottomNav() {
   const pathname = usePathname();
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/90 pb-safe backdrop-blur-lg md:hidden">
+    <nav data-hide-on-keyboard className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/90 pb-safe backdrop-blur-lg md:hidden">
       <ul className="grid grid-cols-4">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const active = isActive(pathname, href);
+        {NAV_ITEMS.map((item) => {
+          const { href, label, icon: Icon } = item;
+          const active = isActive(pathname, item);
           return (
             <li key={href}>
               <Link
@@ -20,7 +21,7 @@ export function BottomNav() {
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium",
-                  active ? "text-primary" : "text-muted-foreground",
+                  active ? "text-foreground" : "text-muted-foreground",
                 )}
               >
                 <Icon className="size-[22px]" strokeWidth={active ? 2.25 : 1.75} />

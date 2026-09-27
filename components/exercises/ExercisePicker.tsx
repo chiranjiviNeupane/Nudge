@@ -8,6 +8,9 @@ import { useExercises } from "@/lib/hooks/data";
 import { createExercise, type ExerciseInput } from "@/lib/repositories/exercises";
 import { ExerciseDialog } from "./ExerciseDialog";
 import type { Exercise } from "@/lib/db/types";
+import type { MuscleGroup } from "@/lib/muscleGroups";
+import { matchesGroup, MuscleGroupFilter } from "./MuscleGroupChips";
+import { errorMessage } from "@/lib/repositories/errors";
 
 /**
  * Searchable exercise list with inline "Create …". Shared by the template
@@ -24,11 +27,12 @@ export function ExercisePicker({
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [group, setGroup] = useState<MuscleGroup | null>(null);
 
   const q = query.trim().toLowerCase();
   const excluded = useMemo(() => new Set(excludeIds), [excludeIds]);
   const matches = (exercises ?? []).filter(
-    (e) => !excluded.has(e.id) && (!q || e.name.toLowerCase().includes(q)),
+    (e) => !excluded.has(e.id) && (!q || e.name.toLowerCase().includes(q)) && matchesGroup(e, group),
   );
   const exactExists = (exercises ?? []).some((e) => e.name.toLowerCase() === q);
 
@@ -49,7 +53,7 @@ export function ExercisePicker({
     try {
       await onPick(exercise);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not add exercise");
+      toast.error(errorMessage(e, "Couldn’t add exercise"));
     }
   }
 
@@ -72,6 +76,7 @@ export function ExercisePicker({
           aria-label="Search exercises"
         />
       </div>
+      <MuscleGroupFilter exercises={exercises ?? []} value={group} onChange={setGroup} />
       <ul className="-mx-2 min-h-40 flex-1 overflow-y-auto">
         {q && !exactExists && (
           <li>
@@ -79,7 +84,7 @@ export function ExercisePicker({
               type="button"
               disabled={busy}
               onClick={create}
-              className="flex h-11 w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-medium text-primary outline-none hover:bg-muted focus-visible:bg-muted"
+              className="flex h-11 w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-medium text-foreground outline-none hover:bg-muted focus-visible:bg-muted"
             >
               <Plus className="size-4" />
               Create “{query.trim()}”
@@ -98,7 +103,10 @@ export function ExercisePicker({
             </button>
           </li>
         ))}
-        {exercises && matches.length === 0 && !q && (
+        {exercises && matches.length === 0 && !q && group && (
+          <li className="px-2 py-6 text-center text-sm text-muted-foreground">Nothing else tagged with this.</li>
+        )}
+        {exercises && matches.length === 0 && !q && !group && (
           <li className="px-2 py-6 text-center text-sm text-muted-foreground">
             Type a name to create your first exercise.
           </li>
@@ -110,7 +118,7 @@ export function ExercisePicker({
         onOpenChange={setCreating}
         title="New exercise"
         submitLabel="Create and add"
-        initial={{ name: query.trim() }}
+        initial={{ name: query.trim(), muscleGroups: group ? [group] : [] }}
         onSubmit={submitNew}
       />
     </div>

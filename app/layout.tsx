@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
+import { KeyboardInset } from "@/components/providers/KeyboardInset";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,9 +16,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Record",
-  description: "A fast, minimal workout log.",
-  appleWebApp: { capable: true, title: "Record", statusBarStyle: "default" },
+  title: "Nudge",
+  description: "A fast, minimal workout log. Log every set, nudge it up.",
+  appleWebApp: { capable: true, title: "Nudge", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
@@ -41,6 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
           <Toaster position="top-center" />
+          <KeyboardInset />
         </ThemeProvider>
       </body>
     </html>

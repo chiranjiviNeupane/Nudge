@@ -15,3 +15,4 @@ export function useMediaQuery(query: string): boolean {
 }
 
 export const useIsDesktop = () => useMediaQuery("(min-width: 768px)");
+export const useIsWide = () => useMediaQuery("(min-width: 1024px)");

@@ -14,6 +14,7 @@ import type { TemplateWithExercises } from "@/lib/hooks/data";
 import { deleteTemplate, saveTemplate } from "@/lib/repositories/templates";
 import { DEFAULT_SETS } from "@/lib/workout/buildSession";
 import { newId } from "@/lib/id";
+import { errorMessage } from "@/lib/repositories/errors";
 
 type Item = { key: string; exerciseId: string; name: string; defaultSets: number };
 
@@ -50,7 +51,7 @@ export function TemplateEditor({ template }: { template: TemplateWithExercises |
 
   async function save() {
     if (!name.trim()) {
-      toast.error("Give the workout a name.");
+      toast.error("Give the routine a name.");
       return;
     }
     setSaving(true);
@@ -60,10 +61,10 @@ export function TemplateEditor({ template }: { template: TemplateWithExercises |
         name,
         items.map((i) => ({ exerciseId: i.exerciseId, defaultSets: i.defaultSets })),
       );
-      toast.success("Workout saved");
+      toast.success("Routine saved");
       router.push("/workouts");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save");
+      toast.error(errorMessage(e, "Couldn’t save routine"));
       setSaving(false);
     }
   }
@@ -71,14 +72,14 @@ export function TemplateEditor({ template }: { template: TemplateWithExercises |
   return (
     <Page wide className="pb-44 md:pb-32">
       <PageHeader
-        title={template ? "Edit workout" : "New workout"}
-        back={{ href: "/workouts", label: "Workouts" }}
+        title={template ? "Edit routine" : "New routine"}
+        back={{ href: "/workouts", label: "Routines" }}
         action={
           template && (
             <Button
               variant="ghost"
               size="icon-lg"
-              aria-label="Delete workout"
+              aria-label="Delete routine"
               onClick={() => setConfirmDelete(true)}
             >
               <Trash2 className="text-destructive" />
@@ -177,7 +178,7 @@ export function TemplateEditor({ template }: { template: TemplateWithExercises |
       </Button>
 
       {/* Sticky save bar, above the bottom nav on mobile. */}
-      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t bg-background/90 backdrop-blur-lg md:bottom-0 md:left-60">
+      <div data-hide-on-keyboard className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t bg-background/90 backdrop-blur-lg md:bottom-0 md:left-60">
         <div className="mx-auto flex max-w-3xl gap-2 px-4 py-3 md:px-8">
           <Button variant="secondary" size="cta" className="flex-1" onClick={() => router.push("/workouts")}>
             Cancel
@@ -214,7 +215,7 @@ export function TemplateEditor({ template }: { template: TemplateWithExercises |
               await deleteTemplate(template.id);
               router.replace("/workouts");
             } catch (e) {
-              toast.error(e instanceof Error ? e.message : "Could not delete");
+              toast.error(errorMessage(e, "Couldn’t delete routine"));
             }
           }}
         />

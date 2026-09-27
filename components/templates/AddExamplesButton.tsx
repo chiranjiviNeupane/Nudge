@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { addExampleRoutines } from "@/lib/repositories/examples";
+import { errorMessage } from "@/lib/repositories/errors";
 
 /** One-tap Push / Pull / Leg starter routines, shown in empty states. */
 export function AddExamplesButton({ className }: { className?: string }) {
@@ -20,7 +21,7 @@ export function AddExamplesButton({ className }: { className?: string }) {
           const n = await addExampleRoutines();
           toast.success(n > 0 ? "Added Push, Pull and Leg Day" : "Examples already added");
         } catch (e) {
-          toast.error(e instanceof Error ? e.message : "Could not add examples");
+          toast.error(errorMessage(e, "Couldn’t add examples"));
         } finally {
           setAdding(false);
         }

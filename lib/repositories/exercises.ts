@@ -4,6 +4,7 @@ import { newId } from "@/lib/id";
 import type { Exercise, ExerciseHistory, ExerciseKind, HistoryEntry, LoggedSet } from "@/lib/db/types";
 import { check, RepositoryError } from "./errors";
 import { normalizeSets, SET_COLUMNS } from "./sets";
+import type { MuscleGroup } from "@/lib/muscleGroups";
 
 /** Editable exercise settings. */
 export type ExerciseInput = {
@@ -11,57 +12,57 @@ export type ExerciseInput = {
   kind: ExerciseKind;
   /** Only meaningful for timed exercises. */
   trackIncline: boolean;
+  muscleGroups: MuscleGroup[];
 };
 
 const toRow = (input: ExerciseInput) => ({
   name: cleanName(input.name),
   kind: input.kind,
   track_incline: input.kind === "timed" && input.trackIncline,
+  muscle_groups: input.muscleGroups,
 });
 
 const cleanName = (name: string) => name.trim().replace(/\s+/g, " ");
 
 export async function fetchExercises(): Promise<Exercise[]> {
   const { data, error } = await getSupabase().from("exercises").select("*").order("name");
-  check(error, "Could not load exercises");
+  check(error, "Couldn’t load exercises");
   return data ?? [];
 }
 
-export async function createExercise(
-  input: ExerciseInput | string,
-): Promise<Exercise> {
-  const row = toRow(typeof input === "string" ? { name: input, kind: "strength", trackIncline: false } : input);
-  if (!row.name) throw new RepositoryError("Exercise name is required.");
+export async function createExercise(input: ExerciseInput): Promise<Exercise> {
+  const row = toRow(input);
+  if (!row.name) throw new RepositoryError("Give the exercise a name.");
   const { data, error } = await getSupabase()
     .from("exercises")
     .insert({ id: newId(), ...row })
     .select()
     .single();
-  check(error, "Could not create exercise");
+  check(error, "Couldn’t create exercise");
   await db.exercises.put(data);
   return data;
 }
 
-/** Find an exercise by name (case-insensitive) or create it. */
-export async function findOrCreateExercise(name: string): Promise<Exercise> {
+/** Find a strength exercise by name (case-insensitive) or create it with these muscle groups. */
+export async function findOrCreateExercise(name: string, muscleGroups: MuscleGroup[] = []): Promise<Exercise> {
   const value = cleanName(name);
   const existing = await db.exercises
     .filter((e) => e.name.toLowerCase() === value.toLowerCase())
     .first();
-  return existing ?? createExercise(value);
+  return existing ?? createExercise({ name: value, kind: "strength", trackIncline: false, muscleGroups });
 }
 
 /** Update name, type and incline tracking. Past sets are untouched. */
 export async function updateExercise(id: string, input: ExerciseInput): Promise<void> {
   const row = toRow(input);
-  if (!row.name) throw new RepositoryError("Exercise name is required.");
+  if (!row.name) throw new RepositoryError("Give the exercise a name.");
   const { data, error } = await getSupabase()
     .from("exercises")
     .update(row)
     .eq("id", id)
     .select()
     .single();
-  check(error, "Could not update exercise");
+  check(error, "Couldn’t update exercise");
   await db.exercises.put(data);
 }
 
@@ -69,11 +70,11 @@ export async function deleteExercise(id: string): Promise<void> {
   const { error } = await getSupabase().from("exercises").delete().eq("id", id);
   if (error?.code === "23503") {
     throw new RepositoryError(
-      "This exercise is used in a workout or in your history, so it can't be deleted.",
+      "This exercise is used in a routine or in your history, so it can’t be deleted.",
       error.code,
     );
   }
-  check(error, "Could not delete exercise");
+  check(error, "Couldn’t delete exercise");
   await db.transaction("rw", [db.exercises, db.lastSessions, db.history], async () => {
     await db.exercises.delete(id);
     await db.lastSessions.delete(id);
@@ -97,7 +98,7 @@ export async function refreshExerciseHistory(exerciseId: string): Promise<Exerci
     .eq("exercise_id", exerciseId)
     .neq("status", "skipped")
     .eq("workout_sessions.status", "completed");
-  check(error, "Could not load history");
+  check(error, "Couldn’t load history");
 
   const entries: HistoryEntry[] = ((data ?? []) as HistoryRow[])
     .filter((row) => row.sets.length > 0)

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { getActiveSession, startWorkout } from "@/lib/repositories/activeSession";
+import { errorMessage } from "@/lib/repositories/errors";
 
 /** Start a workout from a template, or resume the one already in progress. */
 export function useStartWorkout() {
@@ -21,7 +22,7 @@ export function useStartWorkout() {
       }
       router.push("/workout");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not start workout");
+      toast.error(errorMessage(e, "Couldn’t start workout"));
       setStarting(null);
     }
   }

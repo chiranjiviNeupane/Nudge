@@ -2,6 +2,7 @@
 
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/lib/db/dexie";
+import { ACTIVITY_KEY } from "@/lib/sync/refresh";
 import type { Exercise, WorkoutTemplate } from "@/lib/db/types";
 
 // Read-side hooks. Components read the local cache reactively; repositories
@@ -63,4 +64,15 @@ export function useExerciseHistory(exerciseId: string) {
 
 export function useSessionDetail(sessionId: string) {
   return useLiveQuery(async () => (await db.sessionDetails.get(sessionId)) ?? null, [sessionId]);
+}
+
+/**
+ * Completion times of the last year's workouts (weekly goal, streak).
+ * `undefined` while loading, `null` if not synced yet since this was added.
+ */
+export function useActivity() {
+  return useLiveQuery(async () => {
+    const row = await db.meta.get(ACTIVITY_KEY);
+    return row ? (JSON.parse(row.value) as string[]) : null;
+  }, []);
 }

@@ -2,21 +2,26 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/** Centered content column used by every tab screen. */
+/**
+ * Centered content column used by every tab screen. `wide` for data-heavy
+ * pages; `full` for pages that switch to two columns on large screens.
+ */
 export function Page({
   children,
   wide = false,
+  full = false,
   className,
 }: {
   children: React.ReactNode;
   wide?: boolean;
+  full?: boolean;
   className?: string;
 }) {
   return (
     <main
       className={cn(
-        "mx-auto w-full px-4 pt-2 pb-28 md:px-8 md:pt-6 md:pb-12",
-        wide ? "max-w-3xl" : "max-w-2xl",
+        "mx-auto w-full px-4 pt-2 pb-28 md:px-8 md:pt-10 md:pb-12",
+        full ? "max-w-2xl lg:max-w-5xl" : wide ? "max-w-3xl" : "max-w-2xl",
         className,
       )}
     >

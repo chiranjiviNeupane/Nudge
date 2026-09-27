@@ -1,5 +1,8 @@
 // Row types mirror supabase/schema.sql.
 
+import type { WeightUnit } from "@/lib/units";
+import type { MuscleGroup } from "@/lib/muscleGroups";
+
 /** strength: weight × reps. timed: duration (optionally with incline). */
 export type ExerciseKind = "strength" | "timed";
 
@@ -9,6 +12,8 @@ export type Exercise = {
   name: string;
   kind: ExerciseKind;
   track_incline: boolean;
+  /** Optional because caches from before tags existed lack it. */
+  muscle_groups?: MuscleGroup[];
   created_at: string;
   updated_at: string;
 };
@@ -79,6 +84,16 @@ export type LastSession = {
   sets: LoggedSet[];
 };
 
+/** All-time bests for one exercise (result of get_exercise_bests). Weights in kg. */
+export type ExerciseBest = {
+  exercise_id: string;
+  best_e1rm: number | null;
+  best_weight: number | null;
+  /** Bodyweight sets only. */
+  best_reps: number | null;
+  best_duration: number | null;
+};
+
 /** Lightweight summary used for "Recent" on the home screen. */
 export type SessionSummary = {
   id: string;
@@ -129,6 +144,8 @@ export type DraftSet = {
   /** Timed sets: "30", "30:15" or "1:05:00". Optional for drafts made before timed exercises. */
   duration?: string;
   incline?: string;
+  /** Exact kg the weight field was pre-filled from, so an unchanged lb value doesn't drift when saved. */
+  weightKg?: number;
   completed: boolean;
   /** True once the user changed a value (or added the set). Untouched pre-filled sets may not have been done. */
   touched?: boolean;
@@ -145,6 +162,8 @@ export type DraftExercise = {
   skipped: boolean;
   sets: DraftSet[];
   last: LastSession | null;
+  /** All-time bests when the exercise was added, for PR badges. Missing on older drafts (no badges). */
+  best?: ExerciseBest | null;
 };
 
 export type ActiveSession = {
@@ -157,6 +176,8 @@ export type ActiveSession = {
   startedAt: string;
   /** Last time the user changed anything. Optional for drafts saved before this existed. */
   updatedAt?: string;
+  /** Unit the draft's weights are typed in, fixed when it starts. Missing = kg (older drafts). */
+  weightUnit?: WeightUnit;
   exercises: DraftExercise[];
 };
 
